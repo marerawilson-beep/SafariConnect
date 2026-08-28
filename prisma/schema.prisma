@@ -8,331 +8,135 @@ datasource db {
 }
 
 enum Role {
-  TRAVELLER
-  VENDOR
-  ADMIN
-  SUPER_ADMIN
+  traveller
+  vendor
+  administrator
+  super_administrator
 }
 
-enum VendorStatus {
-  DRAFT
-  SUBMITTED
-  UNDER_REVIEW
-  MORE_INFORMATION_REQUIRED
-  APPROVED
-  REJECTED
-  SUSPENDED
-}
-
-enum ListingStatus {
-  DRAFT
-  PENDING_APPROVAL
-  PUBLISHED
-  REJECTED
-  SUSPENDED
-}
-
-enum BookingStatus {
-  DRAFT
-  SUBMITTED
-  VIEWED
-  VENDOR_RESPONDED
-  ACCEPTED
-  DECLINED
-  CANCELLED
-  COMPLETED
+enum ListingType {
+  accommodation
+  tour
+  activity
+  restaurant
 }
 
 model User {
-  id            String           @id @default(uuid())
-  email         String           @unique
+  id            String    @id @default(cuid())
   name          String
-  passwordHash  String?
-  role          Role             @default(TRAVELLER)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  profile       Profile?
-  vendor        Vendor?
-  requests      BookingRequest[]
-  reviews       Review[]
-  messages      Message[]
-  notifications Notification[]
-  wishlist      Wishlist?
+  email         String    @unique
+  passwordHash  String
+  role          Role      @default(traveller)
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  listings      Listing[] @relation("ListingOwner")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
-model Profile {
-  id      String  @id @default(uuid())
-  userId  String  @unique
-  phone   String?
-  country String?
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+// Auth.js-compatible OAuth account records. Credentials sign-in uses JWTs,
+// but these tables keep the model ready for a provider in a later milestone.
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
 }
 
-model Vendor {
-  id            String               @id @default(uuid())
-  userId        String               @unique
-  businessName  String
-  businessType  String
-  status        VendorStatus         @default(DRAFT)
-  verified      Boolean              @default(false)
-  user          User                 @relation(fields: [userId], references: [id])
-  listings      Listing[]
-  documents     VendorDocument[]
-  verifications VendorVerification[]
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model VendorDocument {
-  id       String @id @default(uuid())
-  vendorId String
-  name     String
-  url      String
-  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
-model VendorVerification {
-  id        String       @id @default(uuid())
-  vendorId  String
-  status    VendorStatus
-  notes     String?
-  vendor    Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  createdAt DateTime     @default(now())
-}
-
-model Category {
-  id       String    @id @default(uuid())
-  name     String    @unique
-  slug     String    @unique
-  group    String
-  listings Listing[]
-}
-
-model Destination {
-  id          String    @id @default(uuid())
-  name        String    @unique
-  slug        String    @unique
-  description String?
-  listings    Listing[]
-}
-
+// Shared marketplace record. Type-specific details belong to exactly one
+// optional extension model, keeping common discovery fields in one place.
 model Listing {
-  id            String            @id @default(uuid())
-  slug          String            @unique
-  vendorId      String
-  categoryId    String
-  destinationId String
-  name          String
+  id            String       @id @default(cuid())
+  ownerId       String
+  type          ListingType
+  slug          String       @unique
+  title         String
   description   String
-  price         Decimal           @db.Decimal(12, 2)
-  currency      String            @default("KES")
-  status        ListingStatus     @default(DRAFT)
-  vendor        Vendor            @relation(fields: [vendorId], references: [id])
-  category      Category          @relation(fields: [categoryId], references: [id])
-  destination   Destination       @relation(fields: [destinationId], references: [id])
+  location      String
+  priceFrom     Decimal      @db.Decimal(12, 2)
+  currency      String       @default("KES")
+  isPublished   Boolean      @default(false)
+  owner         User         @relation("ListingOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   images        ListingImage[]
-  amenities     ListingAmenity[]
-  availability  Availability[]
-  rooms         Room[]
-  tour          TourPackage?
-  requests      BookingRequest[]
-  reviews       Review[]
-  featured      FeaturedListing[]
+  accommodation Accommodation?
+  tour          Tour?
+  activity      Activity?
+  restaurant    Restaurant?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
-  @@index([destinationId, status])
+  @@index([type, isPublished])
+  @@index([location, isPublished])
 }
 
 model ListingImage {
-  id        String  @id @default(uuid())
+  id        String  @id @default(cuid())
   listingId String
   url       String
+  alt       String?
   position  Int     @default(0)
   listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, position])
 }
 
-model Amenity {
-  id       String           @id @default(uuid())
-  name     String           @unique
-  listings ListingAmenity[]
-}
-
-model ListingAmenity {
-  listingId String
-  amenityId String
-  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  amenity   Amenity @relation(fields: [amenityId], references: [id])
-
-  @@id([listingId, amenityId])
-}
-
-model Availability {
-  id        String   @id @default(uuid())
-  listingId String
-  startDate DateTime
-  endDate   DateTime
-  available Boolean  @default(true)
-  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
-}
-
-model Room {
-  id        String  @id @default(uuid())
-  listingId String
-  name      String
-  guests    Int
-  beds      Int
-  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-}
-
-model TourPackage {
-  id           String          @id @default(uuid())
-  listingId    String          @unique
-  durationDays Int
-  listing      Listing         @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  itinerary    TourItinerary[]
-}
-
-model TourItinerary {
-  id            String      @id @default(uuid())
-  tourPackageId String
-  day           Int
-  title         String
-  description   String
-  tour          TourPackage @relation(fields: [tourPackageId], references: [id], onDelete: Cascade)
-}
-
-model BookingRequest {
-  id           String         @id @default(uuid())
-  reference    String         @unique
-  listingId    String
-  travellerId  String
-  status       BookingStatus  @default(DRAFT)
-  startDate    DateTime
-  endDate      DateTime
-  guests       Int
-  listing      Listing        @relation(fields: [listingId], references: [id])
-  traveller    User           @relation(fields: [travellerId], references: [id])
-  guestsDetail BookingGuest[]
-}
-
-model BookingGuest {
-  id               String         @id @default(uuid())
-  bookingRequestId String
-  name             String
-  bookingRequest   BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
-}
-
-model Conversation {
-  id       String    @id @default(uuid())
-  messages Message[]
-}
-
-model Message {
-  id             String       @id @default(uuid())
-  conversationId String
-  senderId       String
-  body           String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender         User         @relation(fields: [senderId], references: [id])
-  createdAt      DateTime     @default(now())
-}
-
-model Wishlist {
-  id     String         @id @default(uuid())
-  userId String         @unique
-  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items  WishlistItem[]
-}
-
-model WishlistItem {
-  id         String   @id @default(uuid())
-  wishlistId String
-  listingId  String
-  wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
-
-  @@unique([wishlistId, listingId])
-}
-
-model Review {
-  id          String          @id @default(uuid())
-  listingId   String
-  travellerId String
-  rating      Int
-  body        String
-  listing     Listing         @relation(fields: [listingId], references: [id])
-  traveller   User            @relation(fields: [travellerId], references: [id])
-  response    ReviewResponse?
-}
-
-model ReviewResponse {
-  id       String @id @default(uuid())
-  reviewId String @unique
-  body     String
-  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-}
-
-model Notification {
-  id        String   @id @default(uuid())
-  userId    String
-  type      String
-  body      String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-}
-
-model BlogCategory {
-  id    String     @id @default(uuid())
-  name  String     @unique
-  posts BlogPost[]
-}
-
-model BlogPost {
-  id         String        @id @default(uuid())
-  title      String
-  slug       String        @unique
-  content    String
-  categoryId String?
-  category   BlogCategory? @relation(fields: [categoryId], references: [id])
-}
-
-model Report {
-  id         String @id @default(uuid())
-  reporterId String
-  targetType String
-  targetId   String
-  reason     String
-}
-
-model FeaturedListing {
-  id        String  @id @default(uuid())
+model Accommodation {
+  id        String  @id @default(cuid())
   listingId String  @unique
+  rooms     Int?
+  guests    Int?
   listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 }
 
-model SavedItinerary {
-  id     String @id @default(uuid())
-  userId String
-  title  String
-  data   Json
+model Tour {
+  id           String  @id @default(cuid())
+  listingId    String  @unique
+  durationDays Int
+  maxGuests    Int?
+  listing      Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 }
 
-model AIConversation {
-  id       String      @id @default(uuid())
-  userId   String
-  messages AIMessage[]
+model Activity {
+  id              String  @id @default(cuid())
+  listingId       String  @unique
+  durationMinutes Int
+  minAge          Int?
+  listing         Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 }
 
-model AIMessage {
-  id             String         @id @default(uuid())
-  conversationId String
-  role           String
-  content        String
-  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-}
-
-model AuditLog {
-  id         String   @id @default(uuid())
-  actorId    String?
-  action     String
-  targetType String
-  targetId   String?
-  metadata   Json?
-  createdAt  DateTime @default(now())
+model Restaurant {
+  id        String  @id @default(cuid())
+  listingId String  @unique
+  cuisine   String?
+  address   String?
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 }
