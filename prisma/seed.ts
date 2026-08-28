@@ -1,4 +1,4 @@
-import { ListingType, PrismaClient, Role } from "@prisma/client";
+import { PrismaClient, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -22,29 +22,31 @@ async function main() {
   }
 
   const vendor = await prisma.user.findUniqueOrThrow({ where: { email: "vendor@safariconnect.demo" } });
-  const listings = [
-    { slug: "mara-sunrise-camp", title: "Mara Sunrise Camp", type: ListingType.accommodation, location: "Maasai Mara", description: "An intimate camp near the reserve.", priceFrom: 38500, accommodation: { rooms: 12, guests: 2 } },
-    { slug: "amboseli-elephant-trail", title: "Amboseli Elephant Trail", type: ListingType.tour, location: "Amboseli", description: "A three-day guided wildlife journey.", priceFrom: 52000, tour: { durationDays: 3, maxGuests: 8 } },
-    { slug: "nairobi-food-stories", title: "Nairobi Food & Stories", type: ListingType.activity, location: "Nairobi", description: "A local food and culture walk.", priceFrom: 6800, activity: { durationMinutes: 240, minAge: 12 } },
-    { slug: "diani-tide-table", title: "Diani Tide Table", type: ListingType.restaurant, location: "Diani Beach", description: "Fresh coastal plates by the ocean.", priceFrom: 2500, restaurant: { cuisine: "Kenyan coastal", address: "Diani Beach Road" } },
-  ];
+  const owner = { connect: { id: vendor.id } };
 
-  for (const item of listings) {
-    const { accommodation, tour, activity, restaurant, ...listing } = item;
-    await prisma.listing.upsert({
-      where: { slug: listing.slug },
-      update: { ...listing, ownerId: vendor.id, isPublished: true },
-      create: {
-        ...listing,
-        ownerId: vendor.id,
-        isPublished: true,
-        accommodation: accommodation ? { create: accommodation } : undefined,
-        tour: tour ? { create: tour } : undefined,
-        activity: activity ? { create: activity } : undefined,
-        restaurant: restaurant ? { create: restaurant } : undefined,
-      },
-    });
-  }
+  await prisma.listing.upsert({
+    where: { slug: "mara-sunrise-camp" },
+    update: { title: "Mara Sunrise Camp", description: "An intimate camp near the reserve.", location: "Maasai Mara", priceFrom: 38500, isPublished: true, owner },
+    create: { slug: "mara-sunrise-camp", title: "Mara Sunrise Camp", type: "accommodation", description: "An intimate camp near the reserve.", location: "Maasai Mara", priceFrom: 38500, isPublished: true, owner, accommodation: { create: { rooms: 12, guests: 2 } } },
+  });
+
+  await prisma.listing.upsert({
+    where: { slug: "amboseli-elephant-trail" },
+    update: { title: "Amboseli Elephant Trail", description: "A three-day guided wildlife journey.", location: "Amboseli", priceFrom: 52000, isPublished: true, owner },
+    create: { slug: "amboseli-elephant-trail", title: "Amboseli Elephant Trail", type: "tour", description: "A three-day guided wildlife journey.", location: "Amboseli", priceFrom: 52000, isPublished: true, owner, tour: { create: { durationDays: 3, maxGuests: 8 } } },
+  });
+
+  await prisma.listing.upsert({
+    where: { slug: "nairobi-food-stories" },
+    update: { title: "Nairobi Food & Stories", description: "A local food and culture walk.", location: "Nairobi", priceFrom: 6800, isPublished: true, owner },
+    create: { slug: "nairobi-food-stories", title: "Nairobi Food & Stories", type: "activity", description: "A local food and culture walk.", location: "Nairobi", priceFrom: 6800, isPublished: true, owner, activity: { create: { durationMinutes: 240, minAge: 12 } } },
+  });
+
+  await prisma.listing.upsert({
+    where: { slug: "diani-tide-table" },
+    update: { title: "Diani Tide Table", description: "Fresh coastal plates by the ocean.", location: "Diani Beach", priceFrom: 2500, isPublished: true, owner },
+    create: { slug: "diani-tide-table", title: "Diani Tide Table", type: "restaurant", description: "Fresh coastal plates by the ocean.", location: "Diani Beach", priceFrom: 2500, isPublished: true, owner, restaurant: { create: { cuisine: "Kenyan coastal", address: "Diani Beach Road" } } },
+  });
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => prisma.$disconnect());
