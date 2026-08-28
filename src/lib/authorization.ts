@@ -1,6 +1,13 @@
 import { Role } from "@prisma/client";
 import { auth } from "@/auth";
 
+const roles = {
+  traveller: Role.traveller,
+  vendor: Role.vendor,
+  administrator: Role.administrator,
+  superAdministrator: Role.super_administrator,
+} as const;
+
 export class AuthenticationError extends Error {
   constructor() { super("You must be signed in to access this resource."); }
 }
@@ -21,7 +28,7 @@ export async function requireRole(...roles: Role[]) {
   return user;
 }
 
-export const requireTraveller = () => requireRole(Role.traveller);
-export const requireVendor = () => requireRole(Role.vendor, Role.administrator, Role.super_administrator);
-export const requireAdministrator = () => requireRole(Role.administrator, Role.super_administrator);
-export const requireSuperAdministrator = () => requireRole(Role.super_administrator);
+export const requireTraveller = () => requireRole(roles.traveller);
+export const requireVendor = () => requireRole(roles.vendor, roles.administrator, roles.superAdministrator);
+export const requireAdministrator = () => requireRole(roles.administrator, roles.superAdministrator);
+export const requireSuperAdministrator = () => requireRole(roles.superAdministrator);
