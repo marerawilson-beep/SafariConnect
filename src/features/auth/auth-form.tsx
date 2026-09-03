@@ -32,7 +32,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       }
       const result = await signIn("credentials", { email: validation.data.email, password: validation.data.password, redirect: false });
       if (result?.error) { setError("Incorrect email or password."); return; }
-      router.push("/"); router.refresh();
+      router.push("/dashboard"); router.refresh();
     } catch { setError("Something went wrong. Please try again."); }
     finally { setPending(false); }
   }
