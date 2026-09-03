@@ -21,6 +21,13 @@ enum ListingType {
   restaurant
 }
 
+enum BookingRequestStatus {
+  pending
+  accepted
+  declined
+  cancelled
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String
@@ -32,6 +39,11 @@ model User {
   accounts      Account[]
   sessions      Session[]
   listings      Listing[] @relation("ListingOwner")
+  bookingRequests BookingRequest[] @relation("BookingTraveller")
+  trips         Trip[]
+  sentMessages  Message[] @relation("MessageSender")
+  receivedMessages Message[] @relation("MessageRecipient")
+  wishlistItems WishlistItem[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -91,6 +103,9 @@ model Listing {
   tour          Tour?
   activity      Activity?
   restaurant    Restaurant?
+  bookingRequests BookingRequest[]
+  messages      Message[]
+  wishlistItems WishlistItem[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -139,4 +154,68 @@ model Restaurant {
   cuisine   String?
   address   String?
   listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+}
+
+model BookingRequest {
+  id                String               @id @default(cuid())
+  listingId         String
+  travellerId       String
+  status            BookingRequestStatus @default(pending)
+  startDate         DateTime?
+  endDate           DateTime?
+  guests            Int?
+  travellerMessage  String?
+  listing           Listing              @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  traveller         User                 @relation("BookingTraveller", fields: [travellerId], references: [id], onDelete: Cascade)
+  trip              Trip?
+  messages          Message[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@index([travellerId, status])
+  @@index([listingId, status])
+}
+
+model Trip {
+  id               String         @id @default(cuid())
+  bookingRequestId String         @unique
+  travellerId      String
+  bookingRequest   BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  traveller        User           @relation(fields: [travellerId], references: [id], onDelete: Cascade)
+  startDate        DateTime?
+  endDate          DateTime?
+  createdAt        DateTime       @default(now())
+
+  @@index([travellerId, startDate])
+}
+
+model Message {
+  id               String          @id @default(cuid())
+  bookingRequestId String?
+  listingId        String?
+  senderId         String
+  recipientId      String
+  content          String
+  readAt           DateTime?
+  createdAt        DateTime        @default(now())
+  bookingRequest   BookingRequest? @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  listing          Listing?        @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  sender           User            @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient        User            @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([bookingRequestId, createdAt])
+  @@index([listingId, createdAt])
+  @@index([recipientId, readAt])
+}
+
+model WishlistItem {
+  id          String  @id @default(cuid())
+  travellerId String
+  listingId   String
+  traveller   User    @relation(fields: [travellerId], references: [id], onDelete: Cascade)
+  listing     Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([travellerId, listingId])
+  @@index([listingId])
 }
