@@ -14,7 +14,13 @@ export async function POST(request: Request) {
 
   try {
     const passwordHash = await bcrypt.hash(parsed.data.password, 12);
-    await prisma.user.create({ data: { ...parsed.data, passwordHash } });
+    await prisma.user.create({
+      data: {
+        name: parsed.data.name,
+        email: parsed.data.email,
+        passwordHash,
+      },
+    });
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
